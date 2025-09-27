@@ -11,3 +11,4 @@ export { default as ImagePost } from './imagePost';
 export { default as PaymentDetails } from './PaymentDetails';
 export { default as VirtualTryOn } from './VirtualTryOn';
 export { default as VirtualTryOnInline } from './VirtualTryOnInline';
+export { default as AdminMessenger } from './AdminMessenger';

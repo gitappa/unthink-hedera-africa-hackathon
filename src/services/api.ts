@@ -194,6 +194,33 @@ export const userApi = {
   },
 
   /**
+   * Get user info by user ID
+   */
+  getUserInfoById: async (userId: string): Promise<{ user_id: string; user_name: string; emailId: string; full_name?: string; first_name?: string; last_name?: string; _id?: string; is_influencer?: boolean } | null> => {
+    try {
+      const response: AxiosResponse<ApiResponse<any>> = await api.get(`/users/get_user_info/?user_id=${encodeURIComponent(userId)}`);
+
+      if (response.data.status === 'success') {
+        const userData = response.data.data;
+        return {
+          user_id: userData.user_id,
+          user_name: userData.user_name,
+          emailId: userData.emailId,
+          first_name: userData.first_name,
+          last_name: userData.last_name,
+          _id: userData._id,
+          is_influencer: userData.is_influencer || false
+        };
+      } else {
+        return null;
+      }
+    } catch (error) {
+      console.error('Get user info by ID error:', error);
+      return null;
+    }
+  },
+
+  /**
    * Verify user
    */
   verifyUser: async (userId: string, storeName?: string): Promise<boolean> => {
@@ -519,4 +546,21 @@ export default {
   upload: uploadApi,
   collection: collectionApi,
   healthCheck,
+};
+
+// Lightweight HCS publisher client for admin messages
+export const hcsApi = {
+  sendAdminMessage: async (payload: { email: string; message: string; eventId: string }): Promise<boolean> => {
+    try {
+      const res = await fetch('/api/hcs/publish', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      return res.ok;
+    } catch (e) {
+      console.error('HCS publish error:', e);
+      return false;
+    }
+  }
 };

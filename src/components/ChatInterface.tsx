@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { EventData } from '../types';
 import { ChatStage } from '../types';
 import { useChatFlow, useEmailValidation } from '../hooks';
@@ -6,6 +6,9 @@ import ChatMessage from './ChatMessage';
 import ChatInput from './ChatInput';
 import ViewCollectionLink from './ViewCollectionLink';
 import { TryOnSessionProvider } from '../hooks/TryOnSessionContext';
+import { useHcsNotifications } from '../hooks/useHcsNotifications';
+import NotificationBell from './NotificationBell';
+import type { NotificationItem } from './NotificationBell';
 
 interface ChatInterfaceProps {
   eventData: EventData;
@@ -44,6 +47,30 @@ const ChatInterface = ({ eventData }: ChatInterfaceProps) => {
     getFullName,
     loading: emailLoading
   } = useEmailValidation();
+
+  // Start HCS notifications once user email is known
+  const userEmail = (() => {
+    const emailResponse = messages
+      .filter(m => m.type === 'user')
+      .map(m => m.content)
+      .find((c) => typeof c === 'string' && c.includes('@')) as string | undefined;
+    return emailResponse || undefined;
+  })();
+
+  // Notification state (local to ChatInterface)
+  const [notificationsOpen, setNotificationsOpen] = useState<boolean>(false);
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+
+  useHcsNotifications({
+    userEmail,
+    eventId: eventData?._id,
+    onMatch: (msg) => {
+      setNotifications((prev: NotificationItem[]) => [
+        { id: `${Date.now()}-${Math.random().toString(36).slice(2)}`, message: msg, timestamp: Date.now() },
+        ...prev
+      ]);
+    },
+  });
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
@@ -242,6 +269,14 @@ const ChatInterface = ({ eventData }: ChatInterfaceProps) => {
             <ViewCollectionLink userName={userInfo.user_name!} storeName={eventData?.store_name!} />
           ) : null;
         })()}
+
+        {/* Floating Notification Bell */}
+        <NotificationBell
+          notifications={notifications}
+          open={notificationsOpen}
+          onToggle={() => setNotificationsOpen((v: boolean) => !v)}
+          onClear={() => setNotifications([])}
+        />
 
         {/* Chat Container */}
         <div className="bg-white rounded-lg shadow-lg mt-12">

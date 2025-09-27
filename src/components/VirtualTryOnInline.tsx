@@ -1,8 +1,10 @@
 import { useRef, useEffect, useState } from 'react';
 import { Loader2, Wand2, Plus, X } from 'lucide-react';
-import { tryOnApi, collectionApi } from '../services/api';
+import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { tryOnApi, collectionApi, userApi } from '../services/api';
 import { useFileUpload } from '../hooks';
 import { useTryOnSession } from '../hooks/TryOnSessionContext';
+import { db } from '../firebase';
 
 interface TryOnContext {
   store: string;
@@ -33,6 +35,27 @@ const VirtualTryOnInline = ({ tryOnContext, onPhotoSelected, onSkip, userId }: V
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { uploadFile, error } = useFileUpload();
   const { baseImageUrls, setBaseImageUrls } = useTryOnSession();
+
+  // Function to add a new alert to Firestore
+  const addAlertToFirestore = async (collectionPath: string, name: string, emailId: string) => {
+    try {
+      const alertsCollection = collection(db, 'test alert');
+      
+      const alertData = {
+        collection_path: collectionPath,
+        name: name,
+        emaild_id: emailId,
+        timestamp: serverTimestamp() 
+      };
+      
+      const docRef = await addDoc(alertsCollection, alertData);
+      console.log('Alert added with ID:', docRef.id);
+      return docRef.id;
+    } catch (error) {
+      console.error('Error adding alert:', error);
+      throw error;
+    }
+  };
 
   const canGenerate = uploadedItems.filter(i => !i.uploading && i.url).length >= 1 && !generating;
   const canAddMore = uploadedItems.length < tryOnContext.maxImages;
@@ -236,8 +259,30 @@ const VirtualTryOnInline = ({ tryOnContext, onPhotoSelected, onSkip, userId }: V
                   
                   // Extract path from response if available
                   if (collectionResponse && typeof collectionResponse === 'object' && 'path' in collectionResponse) {
-                    setCollectionPath(collectionResponse.path as string);
+                    const path = collectionResponse.path as string;
+                    const full_path = `https://unthink-ui-gatsby-${tryOnContext.store}-ui-314035436999.us-central1.run.app/${userId}/collections/${path}`
+                    setCollectionPath(path);
                     setCollectionCreated(true);
+                    
+                    // Add alert to Firestore after collection is created
+                    try {
+                      // Fetch user information first
+                      let userName = 'User';
+                      let userEmail = 'anonymous';
+                      
+                      if (userId) {
+                        const userInfo = await userApi.getUserInfoById(userId);
+                        if (userInfo) {
+                          userName = userInfo.first_name || userInfo.user_name || 'User';
+                          userEmail = userInfo.emailId || 'anonymous';
+                        }
+                      }
+                      
+                      await addAlertToFirestore(full_path, userName, userEmail);
+                    } catch (alertError) {
+                      console.error('Failed to add alert to Firestore:', alertError);
+                      // Don't throw here - collection creation was successful, alert failure shouldn't break the flow
+                    }
                   }
                   
                   // 3) Add handpicked products (all uploaded + result). Do not re-upload.
