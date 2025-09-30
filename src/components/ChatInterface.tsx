@@ -276,6 +276,8 @@ const ChatInterface = ({ eventData }: ChatInterfaceProps) => {
           open={notificationsOpen}
           onToggle={() => setNotificationsOpen((v: boolean) => !v)}
           onClear={() => setNotifications([])}
+          eventId={eventData?.service_id}
+          emailId={userEmail || undefined}
         />
 
         {/* Chat Container */}

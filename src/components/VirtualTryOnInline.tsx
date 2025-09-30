@@ -37,7 +37,7 @@ const VirtualTryOnInline = ({ tryOnContext, onPhotoSelected, onSkip, userId }: V
   const { baseImageUrls, setBaseImageUrls } = useTryOnSession();
 
   // Function to add a new alert to Firestore
-  const addAlertToFirestore = async (collectionPath: string, name: string, emailId: string) => {
+  const addAlertToFirestore = async (collectionPath: string, name: string, emailId: string, eventId: string) => {
     try {
       const alertsCollection = collection(db, 'test alert');
       
@@ -45,6 +45,8 @@ const VirtualTryOnInline = ({ tryOnContext, onPhotoSelected, onSkip, userId }: V
         collection_path: collectionPath,
         name: name,
         emaild_id: emailId,
+        event_id: eventId,
+        alert_type: 'collection_created',
         timestamp: serverTimestamp() 
       };
       
@@ -278,7 +280,7 @@ const VirtualTryOnInline = ({ tryOnContext, onPhotoSelected, onSkip, userId }: V
                         }
                       }
                       
-                      await addAlertToFirestore(full_path, userName, userEmail);
+                      await addAlertToFirestore(full_path, userName, userEmail, tryOnContext.serviceId);
                     } catch (alertError) {
                       console.error('Failed to add alert to Firestore:', alertError);
                       // Don't throw here - collection creation was successful, alert failure shouldn't break the flow

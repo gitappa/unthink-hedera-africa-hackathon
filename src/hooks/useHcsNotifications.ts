@@ -1,9 +1,9 @@
 import { useEffect, useRef } from 'react';
 
 type NotificationMessage = {
-  email: string;
+  email_id: string;
   message: string;
-  eventId?: string;
+  event_id?: string;
 };
 
 interface UseHcsNotificationsParams {
@@ -14,8 +14,14 @@ interface UseHcsNotificationsParams {
 }
 
 export function useHcsNotifications({ userEmail, eventId, onMatch, pollMs = 4000 }: UseHcsNotificationsParams) {
-  const lastConsensusTimeRef = useRef<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const seenRef = useRef<Set<string>>(new Set());
+  const onMatchRef = useRef(onMatch);
+
+  // Keep latest callback without retriggering main effect
+  useEffect(() => {
+    onMatchRef.current = onMatch;
+  }, [onMatch]);
 
   useEffect(() => {
     if (!userEmail) return;
@@ -23,45 +29,50 @@ export function useHcsNotifications({ userEmail, eventId, onMatch, pollMs = 4000
     let intervalId: any;
     const normalized = userEmail.trim().toLowerCase();
 
+    // Reset dedupe cache when user or event context changes
+    seenRef.current.clear();
+
     const fetchMessages = async () => {
       try {
         abortRef.current?.abort();
         const controller = new AbortController();
         abortRef.current = controller;
 
-        // Mirror node public endpoint for topic messages; expects VITE_HCS_TARGET_TOPIC_ID
-        const topicId = "0.0.5999297";
-        if (!topicId) return;
-
-        const baseUrl = `https://testnet.mirrornode.hedera.com/api/v1/topics/${topicId}/messages`;
-        const since = lastConsensusTimeRef.current ? `?timestamp=gt:${lastConsensusTimeRef.current}` : '';
-        const res = await fetch(baseUrl + since, { signal: controller.signal });
+        // Call our server endpoint instead of using HCS10Client directly
+        const res = await fetch('/api/hcs/messages', { signal: controller.signal });
         if (!res.ok) return;
+        
         const data = await res.json();
-        const list = (data?.messages || []) as any[];
-        // console.log('[HCS] Mirror returned messages:', list);
-        if (list.length > 0) {
-          console.log('[HCS] Mirror returned messages:', list.length);
+        const messages = data?.messages || [];
+        
+        if (messages.length > 0) {
+          console.log('[HCS] Server returned messages:', messages.length);
         }
-        for (const item of list) {
-          // Update lastConsensusTimeRef
-          if (item.consensus_timestamp) {
-            lastConsensusTimeRef.current = item.consensus_timestamp;
-          }
-          const base64 = item.message as string;
-          if (!base64) continue;
-          try {
-            const decoded = atob(base64);
-            console.log('[HCS] Decoded message:', decoded);
-            const parsed: NotificationMessage = JSON.parse(decoded);
-            const eventMatch = eventId ? parsed?.eventId === eventId : true;
-            if (eventMatch && parsed?.email?.trim().toLowerCase() === normalized && parsed.message) {
-              console.log('[HCS] Matched message for user', normalized, 'event', eventId, '->', parsed.message);
-              onMatch(parsed.message);
+
+        for (const msg of messages) {
+          if (msg.op === 'message' && msg.data) {
+            console.log('[HCS] Message:', typeof(msg.data));
+            try {
+              const parsed: NotificationMessage = JSON.parse(msg.data);
+              console.log('[HCS] Parsed message:', parsed);
+              const eventMatch = eventId ? parsed?.event_id === eventId : true;
+              if (eventMatch && parsed?.email_id?.trim().toLowerCase() === normalized && parsed.message) {
+                const key = `${parsed.email_id?.trim().toLowerCase() || ''}|${parsed.event_id || ''}|${parsed.message}`;
+                if (seenRef.current.has(key)) {
+                  continue;
+                }
+                seenRef.current.add(key);
+                console.log('[HCS] Matched message for user', normalized, 'event', eventId, '->', parsed.message);
+                onMatchRef.current(parsed.message);
+              }
+            } catch (error) {
+              console.error('[HCS] Error parsing message:', error);
             }
-          } catch {}
+          }
         }
-      } catch {}
+      } catch (error) {
+        console.error('[HCS] Error fetching messages:', error);
+      }
     };
 
     // initial fetch and start polling
@@ -72,7 +83,5 @@ export function useHcsNotifications({ userEmail, eventId, onMatch, pollMs = 4000
       clearInterval(intervalId);
       abortRef.current?.abort();
     };
-  }, [userEmail, eventId, onMatch, pollMs]);
+  }, [userEmail, eventId, pollMs]);
 }
-
-
