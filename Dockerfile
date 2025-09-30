@@ -38,11 +38,8 @@ ENV VITE_TARGET_TOPIC_ID=$VITE_TARGET_TOPIC_ID
 # Build the application
 RUN npm run build
 
-# Expose port 4173 (Vite preview default) 
-# Cloud Run will map this to the PORT environment variable
-EXPOSE 4173
+# Cloud Run expects the container to listen on $PORT (default 8080)
+EXPOSE 8080
 
-# Use Vite's preview server to serve the built application
-# The --host 0.0.0.0 allows external connections
-# The --port 4173 sets the port (Cloud Run will override with PORT env var)
-CMD ["npm", "run", "preview", "--", "--host", "0.0.0.0", "--port", "4173"]
+# Start the Express server which serves the built assets and API
+CMD ["node", "server/index.js"]

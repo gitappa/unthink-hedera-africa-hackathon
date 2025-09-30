@@ -2,6 +2,8 @@ import express from 'express';
 import { publishJson } from './publisher.js';
 import { startSubscription } from './subscriber.js';
 import { HCS10Client } from '@hashgraphonline/standards-sdk';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
 // import dotenv from 'dotenv';
 // dotenv.config();
@@ -20,6 +22,12 @@ const hcsClient = new HCS10Client({
 
 const app = express();
 app.use(express.json());
+
+// Serve static files from Vite build output when running in Cloud Run/production
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const distDir = path.resolve(__dirname, '..', 'dist');
+app.use(express.static(distDir));
 
 app.post('/api/hcs/publish', async (req, res) => {
   try {
@@ -53,9 +61,15 @@ app.get('/api/hcs/messages', async (req, res) => {
   }
 });
 
-const port = process.env.PORT || 5174;
+// SPA fallback to index.html for all non-API routes
+app.get('*', (req, res, next) => {
+  if (req.path.startsWith('/api/')) return next();
+  res.sendFile(path.join(distDir, 'index.html'));
+});
+
+const port = process.env.PORT || 8080;
 app.listen(port, () => {
-  console.log(`HCS API listening on :${port}`);
+  console.log(`Server listening on :${port}`);
 });
 
 // Optional: start forwarding worker
