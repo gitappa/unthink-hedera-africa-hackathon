@@ -193,15 +193,6 @@ The project implements a complete HCS-20 token system for reward points:
 - **CORS**: Cross-origin resource sharing
 - **dotenv**: Environment variable management
 
-### Frontend
-- **React**: UI framework
-- **Vite**: Build tool and dev server
-- **Tailwind CSS**: Styling framework
-- **React Router**: Client-side routing
-- **Axios**: HTTP client
-- **Recharts**: Data visualization
-- **Firebase**: Backend services (if used)
-
 ## Development Scripts
 
 - `npm run dev`: Run both backend and frontend in development mode
@@ -242,4 +233,5 @@ The project includes an `nginx.conf` file for reverse proxy configuration in pro
    - Ensure recipient account ID is valid
    - Verify sufficient point balance before transfers
    - Check memo field length constraints
+
 
